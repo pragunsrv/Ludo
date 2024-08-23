@@ -22,7 +22,8 @@ class Ludo:
         self.dice_rolls = []
         self.custom_board = [i for i in range(self.board_size)]
         self.special_spaces = {10: 'Skip', 20: 'Reverse', 30: 'Extra'}
-        self.token_choices = {color: 0 for color in ['Red', 'Green', 'Blue', 'Yellow']} # Track selected tokens
+        self.token_choices = {color: 0 for color in ['Red', 'Green', 'Blue', 'Yellow']}
+        self.token_throws = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow']} # Track each token's moves
 
     def roll_dice(self, num_rolls=1):
         rolls = [random.randint(1, 6) for _ in range(num_rolls)]
@@ -44,6 +45,7 @@ class Ludo:
                 if new_position == self.winning_positions[self.players.index(token)]:
                     token.finished = True
                     token.position = self.board_size
+                self.token_throws[token.color].append(steps)  # Log the move
 
     def handle_special_space(self, token, action):
         if action == 'Skip':
@@ -104,6 +106,41 @@ class Ludo:
             self.token_choices[color] = token_index
             print(f"Token {color} selected.")
 
+    def display_token_throws(self):
+        for color, throws in self.token_throws.items():
+            print(f"Token {color} throws: {throws}")
+
+    def reset_game(self):
+        self.__init__()
+        print("Game reset.")
+
+    def save_game(self, filename):
+        with open(filename, 'w') as file:
+            file.write(f"Current Player: {self.current_player}\n")
+            file.write(f"Winner: {self.winner}\n")
+            file.write(f"Dice Rolls: {self.dice_rolls}\n")
+            file.write(f"Token Throws: {self.token_throws}\n")
+            for idx, token in enumerate(self.players):
+                file.write(f"Player {idx} - Color: {token.color}, Position: {token.position}, Home: {token.home}, Finished: {token.finished}\n")
+
+    def load_game(self, filename):
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+            self.current_player = int(lines[0].strip().split(": ")[1])
+            self.winner = lines[1].strip().split(": ")[1]
+            self.dice_rolls = eval(lines[2].strip().split(": ")[1])
+            self.token_throws = eval(lines[3].strip().split(": ")[1])
+            for idx, line in enumerate(lines[4:]):
+                color, position, home, finished = line.split(", ")[1:5]
+                color = color.split(": ")[1]
+                position = int(position.split(": ")[1])
+                home = home.split(": ")[1] == 'True'
+                finished = finished.split(": ")[1] == 'True'
+                self.players[idx].color = color
+                self.players[idx].position = position
+                self.players[idx].home = home
+                self.players[idx].finished = finished
+
 def main():
     game = Ludo()
     custom_board = [i * 2 % 40 for i in range(40)]
@@ -113,9 +150,12 @@ def main():
         game.play_turn()
         game.display_board()
         game.display_dice_rolls()
+        game.display_token_throws()
         print(f"Round {rounds}: {game.get_positions()}")
         rounds += 1
     print(f"The winner is {game.winner}!")
+    game.save_game('ludo_game_state.txt')
+    print("Game state saved.")
 
 if __name__ == "__main__":
     main()
