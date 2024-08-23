@@ -1,77 +1,91 @@
 import random
 
+class Token:
+    def __init__(self, color):
+        self.position = 0
+        self.home = True
+        self.color = color
+        self.safe_zone = False
+        self.finished = False
+
 class Ludo:
     def __init__(self):
-        self.board = [0] * 40
-        self.players = [{'position': 0, 'home': True, 'color': color, 'safe_zone': False, 'score': 0} for color in ['Red', 'Green', 'Blue', 'Yellow']]
+        self.board_size = 40
+        self.board = [0] * self.board_size
+        self.players = [Token(color) for color in ['Red', 'Green', 'Blue', 'Yellow']]
         self.current_player = 0
         self.start_positions = [0, 10, 20, 30]
         self.safe_zones = set([5, 15, 25, 35])  # Example safe zones
         self.winning_positions = [39] * 4
         self.winner = None
         self.dice_rolls = []
+        self.custom_board = [i for i in range(self.board_size)]
 
     def roll_dice(self, num_rolls=1):
         rolls = [random.randint(1, 6) for _ in range(num_rolls)]
         self.dice_rolls.append(rolls)
         return rolls
 
-    def move_player(self, player_index, steps):
-        player = self.players[player_index]
-        if player['home']:
+    def move_token(self, token, steps):
+        if token.home:
             if steps == 6:
-                player['home'] = False
-                player['position'] = self.start_positions[player_index]
+                token.home = False
+                token.position = self.start_positions[self.players.index(token)]
         else:
-            new_position = player['position'] + steps
-            if new_position < len(self.board):
-                if new_position in self.safe_zones:
-                    player['safe_zone'] = True
-                else:
-                    player['safe_zone'] = False
-                player['position'] = new_position
-                if player['position'] == self.winning_positions[player_index]:
-                    player['home'] = True
-                    player['position'] = 40  # Considered as finished
-                player['score'] += steps  # Update score based on steps moved
+            new_position = token.position + steps
+            if new_position < self.board_size:
+                token.position = new_position
+                token.safe_zone = new_position in self.safe_zones
+                if new_position == self.winning_positions[self.players.index(token)]:
+                    token.finished = True
+                    token.position = self.board_size
+                    self.players[self.players.index(token)].finished = True
 
-    def check_for_landing(self, player_index):
-        player = self.players[player_index]
-        for index, other_player in enumerate(self.players):
-            if index != player_index and other_player['position'] == player['position'] and not other_player['safe_zone']:
-                other_player['home'] = True
-                other_player['position'] = 0
+    def check_for_landing(self, token):
+        for other_token in self.players:
+            if other_token != token and other_token.position == token.position and not other_token.safe_zone:
+                other_token.home = True
+                other_token.position = 0
 
     def play_turn(self):
         if not self.winner:
-            num_rolls = 1 if self.players[self.current_player]['home'] else 2
+            num_rolls = 1 if self.players[self.current_player].home else 2
             dice_rolls = self.roll_dice(num_rolls)
             for roll in dice_rolls:
-                self.move_player(self.current_player, roll)
-                self.check_for_landing(self.current_player)
+                self.move_token(self.players[self.current_player], roll)
+                self.check_for_landing(self.players[self.current_player])
             self.check_for_winner()
             self.current_player = (self.current_player + 1) % 4
 
     def check_for_winner(self):
         for player in self.players:
-            if player['position'] == 40:
-                self.winner = player['color']
+            if player.finished:
+                self.winner = player.color
 
     def get_positions(self):
-        return [(player['color'], player['position'], player['safe_zone'], player['score']) for player in self.players]
+        return [(token.color, token.position, token.safe_zone, token.finished) for token in self.players]
 
     def display_board(self):
-        board_display = ['.' for _ in range(40)]
-        for player in self.players:
-            if player['position'] < 40:
-                board_display[player['position']] = player['color'][0]
+        board_display = ['.' for _ in range(self.board_size)]
+        for token in self.players:
+            if token.position < self.board_size:
+                board_display[token.position] = token.color[0]
         print("Board: " + ''.join(board_display))
 
     def display_dice_rolls(self):
         print("Dice Rolls: ", self.dice_rolls)
 
+    def configure_board(self, new_board):
+        if len(new_board) == self.board_size:
+            self.custom_board = new_board
+            self.board = new_board
+        else:
+            print("New board configuration does not match the current board size.")
+
 def main():
     game = Ludo()
+    custom_board = [i * 2 % 40 for i in range(40)]
+    game.configure_board(custom_board)
     rounds = 0
     while not game.winner:
         game.play_turn()
