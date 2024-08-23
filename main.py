@@ -227,6 +227,40 @@ class Ludo:
                 self.players[idx].position = token_data['position']
                 self.players[idx].home = token_data['home']
                 self.players[idx].finished = token_data['finished']
+    def move_token_(self, token, steps):
+        if token.home:
+            if steps == 6:
+                token.home = False
+                token.position = self.start_positions[self.players.index(token)]
+        else:
+            new_position = token.position + steps
+            if new_position < self.board_size:
+                token.position = new_position
+                token.safe_zone = new_position in self.safe_zones
+                if new_position in self.special_spaces:
+                    self.handle_special_space(token, self.special_spaces[new_position])
+                if new_position == self.winning_positions[self.players.index(token)]:
+                    token.finished = True
+                    token.position = self.board_size
+                self.token_throws[token.color].append(steps)
+                self.token_history[token.color].append((steps, token.position))
+                self.update_player_profile(token.color, steps)
+        self.turn_history.append((self.players[self.current_player].color, steps, token.position))
+
+    def handle_special__space(self, token, action):
+        if action == 'Skip':
+            self.current_player = (self.current_player + 1) % self.num_players
+        elif action == 'Reverse':
+            self.players.reverse()
+        elif action == 'Extra':
+            extra_rolls = self.roll_dice(1)
+            self.move_token(token, extra_rolls[0])
+
+    def check_for_landing_(self, token):
+        for other_token in self.players:
+            if other_token != token and other_token.position == token.position and not other_token.safe_zone:
+                other_token.home = True
+                other_token.position = 0
 
     def show_main_menu(self):
         print("Main Menu:")
