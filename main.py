@@ -28,10 +28,12 @@ class Ludo:
         self.token_choices = {color: 0 for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
         self.token_throws = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
         self.turn_history = []
-        self.player_profiles = {color: {'games_played': 0, 'games_won': 0} for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
-        self.game_settings = {'show_dice_rolls': True, 'show_turn_history': True, 'show_player_profiles': True, 'show_board_graphics': True}
+        self.player_profiles = {color: {'games_played': 0, 'games_won': 0, 'average_roll': 0, 'longest_turn': 0} for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
         self.token_history = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
-        self.custom_rules = {'extra_dice_roll': False, 'reverse_order': False}
+        self.custom_rules = {'extra_dice_roll': False, 'reverse_order': False, 'double_move': False}
+        self.ongoing_turns = []
+        self.current_turn = {'player': None, 'dice_roll': 0, 'moves': []}
+        self.challenge_mode = False
 
     def roll_dice(self, num_rolls=1):
         rolls = [random.randint(1, 6) for _ in range(num_rolls)]
@@ -55,6 +57,7 @@ class Ludo:
                     token.position = self.board_size
                 self.token_throws[token.color].append(steps)
                 self.token_history[token.color].append((steps, token.position))
+                self.update_player_profile(token.color, steps)
         self.turn_history.append((self.players[self.current_player].color, steps, token.position))
 
     def handle_special_space(self, token, action):
@@ -76,16 +79,48 @@ class Ludo:
         token = self.players[self.current_player]
         print(f"{token.color}'s turn.")
         dice_rolls = self.roll_dice()
+        self.current_turn = {'player': token.color, 'dice_roll': sum(dice_rolls), 'moves': []}
         for roll in dice_rolls:
             self.move_token(token, roll)
             self.check_for_landing(token)
+            self.current_turn['moves'].append((roll, token.position))
+        self.ongoing_turns.append(self.current_turn)
         self.check_for_winner()
 
-    def play_turn(self):
-        if not self.winner:
-            self.player_turn()
-            self.current_player = (self.current_player + 1) % self.num_players
+    def update_player_profile_(self, color, steps):
+        profile = self.player_profiles[color]
+        profile['games_played'] += 1
+        profile['average_roll'] = ((profile['average_roll'] * (profile['games_played'] - 1)) + steps) / profile['games_played']
+        longest_turn = max(max(self.current_turn['moves'], key=lambda x: x[0])[0], profile['longest_turn'])
+        profile['longest_turn'] = longest_turn
+    def load_game_(self, filename):
+        with open(filename, 'r') as file:
+            data = json.load(file)
+            self.current_player = data['current_player']
+            self.winner = data['winner']
+            self.dice_rolls = data['dice_rolls']
+            self.token_throws = data['token_throws']
+            self.turn_history = data['turn_history']
+            self.player_profiles = data['player_profiles']
+            self.game_settings = data['game_settings']
+            for idx, token_data in enumerate(data['players']):
+                self.players[idx].color = token_data['color']
+                self.players[idx].position = token_data['position']
+                self.players[idx].home = token_data['home']
+                self.players[idx].finished = token_data['finished']
 
+    def show_main_menu_(self):
+        print("Main Menu:")
+        print("1. Start New Game")
+        print("2. Load Game")
+        print("3. Settings")
+        print("4. Quit")
+
+    def show_save_load_menu_(self):
+        print("Save/Load Menu:")
+        print("1. Save Game")
+        print("2. Load Game")
+        print("3. Back to Main Menu")
     def check_for_winner(self):
         for player in self.players:
             if player.finished:
@@ -130,7 +165,7 @@ class Ludo:
         if self.game_settings['show_player_profiles']:
             print("Player Profiles:")
             for color, profile in self.player_profiles.items():
-                print(f"Player {color} - Games Played: {profile['games_played']}, Games Won: {profile['games_won']}")
+                print(f"Player {color} - Games Played: {profile['games_played']}, Games Won: {profile['games_won']}, Average Roll: {profile['average_roll']:.2f}, Longest Turn: {profile['longest_turn']}")
 
     def display_token_history(self):
         print("Token History:")
@@ -194,27 +229,28 @@ class Ludo:
                 self.players[idx].finished = token_data['finished']
 
     def show_main_menu(self):
-        print("\nLudo Game Menu")
+        print("Main Menu:")
         print("1. Start New Game")
         print("2. Load Game")
-        print("3. View Game Settings")
-        print("4. Exit")
+        print("3. Settings")
+        print("4. Quit")
 
     def show_save_load_menu(self):
-        print("\nSave/Load Menu")
+        print("Save/Load Menu:")
         print("1. Save Game")
         print("2. Load Game")
         print("3. Back to Main Menu")
 
     def show_settings_menu(self):
-        print("\nSettings Menu")
-        print("1. Toggle Dice Rolls Display")
-        print("2. Toggle Turn History Display")
-        print("3. Toggle Player Profiles Display")
-        print("4. Toggle Board Graphics Display")
-        print("5. Toggle Extra Dice Roll Rule")
-        print("6. Toggle Reverse Order Rule")
-        print("7. Back to Main Menu")
+        print("Settings Menu:")
+        print("1. Toggle Show Dice Rolls")
+        print("2. Toggle Show Turn History")
+        print("3. Toggle Show Player Profiles")
+        print("4. Toggle Show Board Graphics")
+        print("5. Toggle Extra Dice Roll")
+        print("6. Toggle Reverse Order")
+        print("7. Toggle Challenge Mode")
+        print("8. Back to Main Menu")
 
     def handle_main_menu(self):
         while True:
@@ -263,6 +299,8 @@ class Ludo:
             elif choice == '6':
                 self.custom_rules['reverse_order'] = not self.custom_rules['reverse_order']
             elif choice == '7':
+                self.custom_rules['challenge_mode'] = not self.custom_rules['challenge_mode']
+            elif choice == '8':
                 break
             else:
                 print("Invalid choice. Please try again.")
@@ -279,7 +317,7 @@ class Ludo:
     def play_game(self):
         rounds = 0
         while not self.winner:
-            self.play_turn()
+            self.player_turn()
             self.display_board()
             self.display_dice_rolls()
             self.display_turn_history()
