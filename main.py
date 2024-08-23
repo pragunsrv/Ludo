@@ -1,5 +1,6 @@
 import random
 import json
+import os
 
 class Token:
     def __init__(self, color):
@@ -11,23 +12,24 @@ class Token:
         self.token_id = f"{color}_{id(self)}"
 
 class Ludo:
-    def __init__(self):
+    def __init__(self, num_players=4):
         self.board_size = 40
         self.board = [0] * self.board_size
-        self.players = [Token(color) for color in ['Red', 'Green', 'Blue', 'Yellow']]
+        self.players = [Token(color) for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]]
+        self.num_players = num_players
         self.current_player = 0
-        self.start_positions = [0, 10, 20, 30]
+        self.start_positions = [0, 10, 20, 30][:num_players]
         self.safe_zones = set([5, 15, 25, 35])
-        self.winning_positions = [39] * 4
+        self.winning_positions = [39] * self.num_players
         self.winner = None
         self.dice_rolls = []
         self.custom_board = [i for i in range(self.board_size)]
         self.special_spaces = {10: 'Skip', 20: 'Reverse', 30: 'Extra'}
-        self.token_choices = {color: 0 for color in ['Red', 'Green', 'Blue', 'Yellow']}
-        self.token_throws = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow']}
+        self.token_choices = {color: 0 for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
+        self.token_throws = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
         self.turn_history = []
-        self.player_profiles = {color: {'games_played': 0, 'games_won': 0} for color in ['Red', 'Green', 'Blue', 'Yellow']}
-        self.game_settings = {'show_dice_rolls': True, 'show_turn_history': True}
+        self.player_profiles = {color: {'games_played': 0, 'games_won': 0} for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
+        self.game_settings = {'show_dice_rolls': True, 'show_turn_history': True, 'show_player_profiles': True}
 
     def roll_dice(self, num_rolls=1):
         rolls = [random.randint(1, 6) for _ in range(num_rolls)]
@@ -54,7 +56,7 @@ class Ludo:
 
     def handle_special_space(self, token, action):
         if action == 'Skip':
-            self.current_player = (self.current_player + 1) % 4
+            self.current_player = (self.current_player + 1) % self.num_players
         elif action == 'Reverse':
             self.players.reverse()
         elif action == 'Extra':
@@ -79,7 +81,7 @@ class Ludo:
     def play_turn(self):
         if not self.winner:
             self.player_turn()
-            self.current_player = (self.current_player + 1) % 4
+            self.current_player = (self.current_player + 1) % self.num_players
 
     def check_for_winner(self):
         for player in self.players:
@@ -97,6 +99,18 @@ class Ludo:
             if token.position < self.board_size:
                 board_display[token.position] = token.color[0]
         print("Board: " + ''.join(board_display))
+        self.display_board_graphics()
+
+    def display_board_graphics(self):
+        graphics = ""
+        for i in range(self.board_size):
+            if i % 10 == 0:
+                graphics += "\n"
+            if i in self.start_positions:
+                graphics += f"[{self.players[self.start_positions.index(i)].color[0]}]"
+            else:
+                graphics += "[ ]"
+        print("Board Graphics:" + graphics)
 
     def display_dice_rolls(self):
         if self.game_settings['show_dice_rolls']:
@@ -107,6 +121,12 @@ class Ludo:
             print("Turn History:")
             for entry in self.turn_history:
                 print(f"Player {entry[0]} rolled {entry[1]} and moved to position {entry[2]}")
+
+    def display_player_profiles(self):
+        if self.game_settings['show_player_profiles']:
+            print("Player Profiles:")
+            for color, profile in self.player_profiles.items():
+                print(f"Player {color} - Games Played: {profile['games_played']}, Games Won: {profile['games_won']}")
 
     def configure_board(self, new_board):
         if len(new_board) == self.board_size:
@@ -125,7 +145,7 @@ class Ludo:
             print(f"Token {color} throws: {throws}")
 
     def reset_game(self):
-        self.__init__()
+        self.__init__(self.num_players)
         print("Game reset.")
 
     def save_game(self, filename):
@@ -164,22 +184,72 @@ class Ludo:
                 self.players[idx].home = token_data['home']
                 self.players[idx].finished = token_data['finished']
 
+    def show_main_menu(self):
+        print("\nLudo Game Menu")
+        print("1. Start New Game")
+        print("2. Load Game")
+        print("3. Exit")
+
+    def show_save_load_menu(self):
+        print("\nSave/Load Menu")
+        print("1. Save Game")
+        print("2. Load Game")
+        print("3. Back to Main Menu")
+
+    def handle_main_menu(self):
+        while True:
+            self.show_main_menu()
+            choice = input("Enter choice: ")
+            if choice == '1':
+                self.start_new_game()
+            elif choice == '2':
+                self.load_game_menu()
+            elif choice == '3':
+                break
+            else:
+                print("Invalid choice. Please try again.")
+
+    def handle_save_load_menu(self):
+        while True:
+            self.show_save_load_menu()
+            choice = input("Enter choice: ")
+            if choice == '1':
+                filename = input("Enter filename to save: ")
+                self.save_game(filename)
+            elif choice == '2':
+                filename = input("Enter filename to load: ")
+                self.load_game(filename)
+            elif choice == '3':
+                break
+            else:
+                print("Invalid choice. Please try again.")
+
+    def start_new_game(self):
+        num_players = int(input("Enter number of players (2-4): "))
+        self.__init__(num_players)
+        self.play_game()
+
+    def load_game_menu(self):
+        self.handle_save_load_menu()
+        self.play_game()
+
+    def play_game(self):
+        rounds = 0
+        while not self.winner:
+            self.play_turn()
+            self.display_board()
+            self.display_dice_rolls()
+            self.display_turn_history()
+            self.display_player_profiles()
+            print(f"Round {rounds}: {self.get_positions()}")
+            rounds += 1
+        print(f"The winner is {self.winner}!")
+        self.save_game('ludo_game_state.json')
+        print("Game state saved.")
+
 def main():
     game = Ludo()
-    custom_board = [i * 2 % 40 for i in range(40)]
-    game.configure_board(custom_board)
-    rounds = 0
-    while not game.winner:
-        game.play_turn()
-        game.display_board()
-        game.display_dice_rolls()
-        game.display_token_throws()
-        game.display_turn_history()
-        print(f"Round {rounds}: {game.get_positions()}")
-        rounds += 1
-    print(f"The winner is {game.winner}!")
-    game.save_game('ludo_game_state.json')
-    print("Game state saved.")
+    game.handle_main_menu()
 
 if __name__ == "__main__":
     main()
