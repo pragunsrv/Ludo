@@ -29,7 +29,9 @@ class Ludo:
         self.token_throws = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
         self.turn_history = []
         self.player_profiles = {color: {'games_played': 0, 'games_won': 0} for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
-        self.game_settings = {'show_dice_rolls': True, 'show_turn_history': True, 'show_player_profiles': True}
+        self.game_settings = {'show_dice_rolls': True, 'show_turn_history': True, 'show_player_profiles': True, 'show_board_graphics': True}
+        self.token_history = {color: [] for color in ['Red', 'Green', 'Blue', 'Yellow'][:num_players]}
+        self.custom_rules = {'extra_dice_roll': False, 'reverse_order': False}
 
     def roll_dice(self, num_rolls=1):
         rolls = [random.randint(1, 6) for _ in range(num_rolls)]
@@ -52,6 +54,7 @@ class Ludo:
                     token.finished = True
                     token.position = self.board_size
                 self.token_throws[token.color].append(steps)
+                self.token_history[token.color].append((steps, token.position))
         self.turn_history.append((self.players[self.current_player].color, steps, token.position))
 
     def handle_special_space(self, token, action):
@@ -99,7 +102,8 @@ class Ludo:
             if token.position < self.board_size:
                 board_display[token.position] = token.color[0]
         print("Board: " + ''.join(board_display))
-        self.display_board_graphics()
+        if self.game_settings['show_board_graphics']:
+            self.display_board_graphics()
 
     def display_board_graphics(self):
         graphics = ""
@@ -127,6 +131,11 @@ class Ludo:
             print("Player Profiles:")
             for color, profile in self.player_profiles.items():
                 print(f"Player {color} - Games Played: {profile['games_played']}, Games Won: {profile['games_won']}")
+
+    def display_token_history(self):
+        print("Token History:")
+        for color, history in self.token_history.items():
+            print(f"Token {color} history: {history}")
 
     def configure_board(self, new_board):
         if len(new_board) == self.board_size:
@@ -188,13 +197,24 @@ class Ludo:
         print("\nLudo Game Menu")
         print("1. Start New Game")
         print("2. Load Game")
-        print("3. Exit")
+        print("3. View Game Settings")
+        print("4. Exit")
 
     def show_save_load_menu(self):
         print("\nSave/Load Menu")
         print("1. Save Game")
         print("2. Load Game")
         print("3. Back to Main Menu")
+
+    def show_settings_menu(self):
+        print("\nSettings Menu")
+        print("1. Toggle Dice Rolls Display")
+        print("2. Toggle Turn History Display")
+        print("3. Toggle Player Profiles Display")
+        print("4. Toggle Board Graphics Display")
+        print("5. Toggle Extra Dice Roll Rule")
+        print("6. Toggle Reverse Order Rule")
+        print("7. Back to Main Menu")
 
     def handle_main_menu(self):
         while True:
@@ -205,6 +225,8 @@ class Ludo:
             elif choice == '2':
                 self.load_game_menu()
             elif choice == '3':
+                self.settings_menu()
+            elif choice == '4':
                 break
             else:
                 print("Invalid choice. Please try again.")
@@ -220,6 +242,27 @@ class Ludo:
                 filename = input("Enter filename to load: ")
                 self.load_game(filename)
             elif choice == '3':
+                break
+            else:
+                print("Invalid choice. Please try again.")
+
+    def settings_menu(self):
+        while True:
+            self.show_settings_menu()
+            choice = input("Enter choice: ")
+            if choice == '1':
+                self.game_settings['show_dice_rolls'] = not self.game_settings['show_dice_rolls']
+            elif choice == '2':
+                self.game_settings['show_turn_history'] = not self.game_settings['show_turn_history']
+            elif choice == '3':
+                self.game_settings['show_player_profiles'] = not self.game_settings['show_player_profiles']
+            elif choice == '4':
+                self.game_settings['show_board_graphics'] = not self.game_settings['show_board_graphics']
+            elif choice == '5':
+                self.custom_rules['extra_dice_roll'] = not self.custom_rules['extra_dice_roll']
+            elif choice == '6':
+                self.custom_rules['reverse_order'] = not self.custom_rules['reverse_order']
+            elif choice == '7':
                 break
             else:
                 print("Invalid choice. Please try again.")
@@ -241,6 +284,7 @@ class Ludo:
             self.display_dice_rolls()
             self.display_turn_history()
             self.display_player_profiles()
+            self.display_token_history()
             print(f"Round {rounds}: {self.get_positions()}")
             rounds += 1
         print(f"The winner is {self.winner}!")
